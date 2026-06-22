@@ -1,4 +1,4 @@
-package com.example.office_scanner
+package com.jainagency.officescanner
 
 import io.flutter.embedding.android.FlutterActivity
 
