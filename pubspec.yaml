@@ -1,0 +1,46 @@
+name: office_scanner
+description: "Document scanner app with PDF export and conversion"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # Document scanning
+  google_mlkit_document_scanner: ^0.3.0
+
+  # Permissions
+  permission_handler: ^11.3.1
+
+  # PDF generation
+  pdf: ^3.10.8
+  printing: ^5.12.0
+
+  # File handling + sharing
+  path_provider: ^2.1.2
+  share_plus: ^7.2.2
+
+  # HTTP for ILovePDF API
+  http: ^1.2.1
+
+  # Image editing
+  image: ^4.1.7
+
+  # Image picker (gallery + camera)
+  image_picker: ^1.1.4
+
+  # File picker (any app - Files, Drive, WhatsApp etc.)
+  file_picker: ^8.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
