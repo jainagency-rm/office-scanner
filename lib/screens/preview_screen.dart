@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 
+import '../app_state.dart';
+import '../services/pdf_service.dart';
+import '../services/recent_scans_service.dart';
 import '../widgets/loading_overlay.dart';
-import 'result_screen.dart';
 import 'scanner_screen.dart';
 
 /// Runs rotation/brightness off the UI isolate. Always re-derives from the
@@ -50,6 +52,8 @@ class PreviewScreen extends StatefulWidget {
 class _PreviewScreenState extends State<PreviewScreen> {
   late List<_ScanPage> _pages;
   final _pageController = PageController();
+  final _pdfService = PdfService();
+  final _recentScansService = RecentScansService();
   int _currentIndex = 0;
   bool _busy = false;
   String _busyMessage = '';
@@ -185,18 +189,29 @@ class _PreviewScreenState extends State<PreviewScreen> {
   Future<void> _done() async {
     setState(() {
       _busy = true;
-      _busyMessage = 'Finishing up...';
+      _busyMessage = 'Saving...';
     });
     try {
       final paths = await _commitEditsAndGetPaths();
       if (!mounted) return;
-      await Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => ResultScreen(imagePaths: paths)),
+      final pdf = await _pdfService.generatePdf(paths);
+      final savedPath = await _pdfService.saveToDownloads(pdf);
+      if (savedPath == null) {
+        _showError('Could not save PDF. Check storage permissions.');
+        setState(() => _busy = false);
+        return;
+      }
+      await _recentScansService.addScan(
+        pdfPath: savedPath,
+        thumbnailPath: paths.first,
+        imagePaths: paths,
+        pageCount: paths.length,
       );
+      if (!mounted) return;
+      shellTabIndex.value = 1;
+      Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
-      _showError('Could not finish: $e');
-    } finally {
+      _showError('Could not save: $e');
       if (mounted) setState(() => _busy = false);
     }
   }
@@ -281,7 +296,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
                 child: ElevatedButton.icon(
                   onPressed: _busy ? null : _done,
                   icon: const Icon(Icons.check_circle_outline),
-                  label: const Text('Done — Save & Share'),
+                  label: const Text('Done — Save'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     foregroundColor: Colors.white,

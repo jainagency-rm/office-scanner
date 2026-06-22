@@ -1,13 +1,11 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 
+import 'app_state.dart';
 import 'screens/preview_screen.dart';
 import 'screens/recent_scans_screen.dart';
 import 'screens/scanner_screen.dart';
-import 'services/recent_scans_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -41,14 +39,31 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
-  final _recentScansKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    shellTabIndex.addListener(_onTabChange);
+  }
+
+  void _onTabChange() => switchTab(shellTabIndex.value);
+
+  @override
+  void dispose() {
+    shellTabIndex.removeListener(_onTabChange);
+    super.dispose();
+  }
+
+  void switchTab(int index) {
+    setState(() => _currentIndex = index);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: _currentIndex == 0
           ? const HomeTab()
-          : RecentScansScreen(key: _recentScansKey),
+          : const RecentScansScreen(),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (i) {

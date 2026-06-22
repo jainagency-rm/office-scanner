@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../main.dart';
 import '../services/pdf_service.dart';
 import '../services/recent_scans_service.dart';
 import '../services/storage_service.dart';
@@ -94,11 +95,21 @@ class _ResultScreenState extends State<ResultScreen> {
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
-        title: Text('${widget.imagePaths.length} Page${widget.imagePaths.length > 1 ? 's' : ''}'),
-        centerTitle: true,
-        backgroundColor: const Color(0xFF1565C0),
-        foregroundColor: Colors.white,
-      ),
+  title: Text('${widget.imagePaths.length} Page${widget.imagePaths.length > 1 ? 's' : ''}'),
+  centerTitle: true,
+  backgroundColor: const Color(0xFF1565C0),
+  foregroundColor: Colors.white,
+  automaticallyImplyLeading: false,
+  actions: [
+    TextButton(
+      onPressed: () {
+  MainShell.switchToRecentScans(context);
+  Navigator.of(context).popUntil((route) => route.isFirst);
+},
+      child: const Text('Finish', style: TextStyle(color: Colors.white, fontSize: 16)),
+    ),
+  ],
+),
       body: LoadingOverlay(
         isLoading: _busy,
         message: _busyMessage,
