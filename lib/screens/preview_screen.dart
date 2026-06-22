@@ -190,7 +190,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
     try {
       final paths = await _commitEditsAndGetPaths();
       if (!mounted) return;
-      await Navigator.push(
+      await Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => ResultScreen(imagePaths: paths)),
       );
@@ -216,19 +216,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Page ${_currentIndex + 1} of ${_pages.length}'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ElevatedButton(
-              onPressed: _busy ? null : _done,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Done'),
-            ),
-          ),
-        ],
+        actions: [],
       ),
       body: LoadingOverlay(
         isLoading: _busy,
@@ -286,6 +274,23 @@ class _PreviewScreenState extends State<PreviewScreen> {
                     tooltip: 'Add more',
                   ),
                 ],
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _busy ? null : _done,
+                  icon: const Icon(Icons.check_circle_outline),
+                  label: const Text('Done — Save & Share'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),

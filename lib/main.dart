@@ -1,9 +1,13 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 
 import 'screens/preview_screen.dart';
+import 'screens/recent_scans_screen.dart';
 import 'screens/scanner_screen.dart';
+import 'services/recent_scans_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -23,26 +27,76 @@ class MyApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const HomeScreen(),
+      home: const MainShell(),
     );
   }
 }
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+class MainShell extends StatefulWidget {
+  const MainShell({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<MainShell> createState() => _MainShellState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _MainShellState extends State<MainShell> {
+  int _currentIndex = 0;
+  final _recentScansKey = GlobalKey();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _currentIndex == 0
+          ? const HomeTab()
+          : RecentScansScreen(key: _recentScansKey),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _currentIndex,
+        onDestinationSelected: (i) {
+          setState(() => _currentIndex = i);
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.folder_outlined),
+            selectedIcon: Icon(Icons.folder),
+            label: 'Recent Scans',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class HomeTab extends StatefulWidget {
+  const HomeTab({super.key});
+
+  @override
+  State<HomeTab> createState() => _HomeTabState();
+}
+
+class _HomeTabState extends State<HomeTab> {
   static const _imageExtensions = {'jpg', 'jpeg', 'png'};
   bool _busy = false;
 
-  Future<void> _scanDocument() async {
+  Future<void> _scanSingle() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const ScannerScreen()),
+      MaterialPageRoute(
+        builder: (_) => const ScannerScreen(multiPage: false),
+      ),
+    );
+  }
+
+  Future<void> _scanMultiple() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const ScannerScreen(multiPage: true),
+      ),
     );
   }
 
@@ -53,7 +107,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final images = await picker.pickMultiImage();
       if (images.isEmpty) return;
       if (!mounted) return;
-      Navigator.push(
+      await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => PreviewScreen(
@@ -87,7 +141,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
       if (!mounted) return;
-      Navigator.push(
+      await Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => PreviewScreen(imagePaths: imagePaths)),
       );
@@ -112,40 +166,43 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            const SizedBox(height: 48),
-            const Icon(Icons.document_scanner, size: 72, color: Colors.white),
-            const SizedBox(height: 12),
+            const SizedBox(height: 24),
+            const Icon(Icons.document_scanner, size: 56, color: Colors.white),
+            const SizedBox(height: 8),
             const Text(
               'Office Scanner',
               style: TextStyle(
-                fontSize: 28,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Scan, edit and share documents',
-              style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.8)),
-            ),
-            const SizedBox(height: 48),
+            const SizedBox(height: 20),
             Expanded(
               child: Container(
                 decoration: const BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
                 ),
-                padding: const EdgeInsets.fromLTRB(32, 40, 32, 32),
-                child: Column(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
                   children: [
                     _ActionButton(
-                      onTap: _busy ? null : _scanDocument,
-                      icon: Icons.camera_alt,
-                      label: 'Scan Document',
-                      subtitle: 'Use camera with auto edge detection',
+                      onTap: _busy ? null : _scanSingle,
+                      icon: Icons.document_scanner,
+                      label: 'Scan Single Page',
+                      subtitle: 'Scan one document at a time',
                       color: const Color(0xFF1565C0),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
+                    _ActionButton(
+                      onTap: _busy ? null : _scanMultiple,
+                      icon: Icons.document_scanner_outlined,
+                      label: 'Scan Multiple Pages',
+                      subtitle: 'Scan multiple pages in one go',
+                      color: const Color(0xFF6A1B9A),
+                    ),
+                    const SizedBox(height: 12),
                     _ActionButton(
                       onTap: _busy ? null : _pickFromGallery,
                       icon: Icons.photo_library,
@@ -153,7 +210,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       subtitle: 'Select images from your gallery',
                       color: const Color(0xFF2E7D32),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     _ActionButton(
                       onTap: _busy ? null : _pickFromFiles,
                       icon: Icons.folder_open,
@@ -162,8 +219,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: const Color(0xFFE65100),
                     ),
                     if (_busy) ...[
-                      const SizedBox(height: 24),
-                      const CircularProgressIndicator(),
+                      const SizedBox(height: 16),
+                      const Center(child: CircularProgressIndicator()),
                     ],
                   ],
                 ),
@@ -227,7 +284,10 @@ class _ActionButton extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
                     ),
                   ],
                 ),

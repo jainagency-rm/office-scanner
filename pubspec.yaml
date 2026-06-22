@@ -30,6 +30,7 @@ dependencies:
 
   # Image editing
   image: ^4.1.7
+  shared_preferences: ^2.3.2
 
   # Image picker (gallery + camera)
   image_picker: ^1.1.4

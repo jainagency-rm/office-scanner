@@ -1,62 +1,72 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 
-/// Copies files into the shared Pictures/Download folders so they show up
-/// outside the app (gallery, file manager, etc).
 class StorageService {
-  Future<bool> _ensureStoragePermission() async {
-    if (!Platform.isAndroid) return true;
-    // Android 13+ uses granular media permissions; older versions use
-    // the legacy storage permission. Try both since we don't know the
-    // OS version up front.
-    final photos = await Permission.photos.request();
-    if (photos.isGranted) return true;
-    final storage = await Permission.storage.request();
-    return storage.isGranted;
-  }
+  static const _appFolderName = 'Office Scanner';
 
-  /// Returns the shared storage root (e.g. /storage/emulated/0), derived
-  /// from the app-specific external directory path.
-  Future<Directory?> _sharedStorageRoot() async {
+  Future<Directory> _getPublicDir(String type) async {
+    // Try public external storage first
     final extDir = await getExternalStorageDirectory();
-    if (extDir == null) return null;
-    final androidIndex = extDir.path.indexOf('Android');
-    if (androidIndex == -1) return null;
-    return Directory(extDir.path.substring(0, androidIndex));
+    if (extDir != null) {
+      // Go up to /storage/emulated/0/
+      final parts = extDir.path.split('/');
+      final androidIdx = parts.indexOf('Android');
+      if (androidIdx != -1) {
+        final root = parts.sublist(0, androidIdx).join('/');
+        final dir = Directory('$root/$type/$_appFolderName');
+        try {
+          await dir.create(recursive: true);
+          // Test if writable
+          final testFile = File('${dir.path}/.test');
+          await testFile.writeAsString('test');
+          await testFile.delete();
+          debugPrint('Using public dir: ${dir.path}');
+          return dir;
+        } catch (_) {}
+      }
+    }
+    // Fallback — app specific external
+    final appExtDir = await getExternalStorageDirectory();
+    if (appExtDir != null) {
+      final dir = Directory('${appExtDir.path}/$_appFolderName/$type');
+      await dir.create(recursive: true);
+      debugPrint('Using app external dir: ${dir.path}');
+      return dir;
+    }
+    // Final fallback — internal
+    final appDoc = await getApplicationDocumentsDirectory();
+    final dir = Directory('${appDoc.path}/$_appFolderName/$type');
+    await dir.create(recursive: true);
+    debugPrint('Using internal dir: ${dir.path}');
+    return dir;
   }
 
-  /// Copies [imagePath] into Pictures/OfficeScanner. Returns false if the
-  /// permission is denied or the OS refuses the direct write (scoped
-  /// storage on Android 10+ can reject this even with permission granted).
   Future<bool> saveImageToGallery(String imagePath) async {
-    if (!await _ensureStoragePermission()) return false;
     try {
-      final root = await _sharedStorageRoot();
-      if (root == null) return false;
-      final picturesDir = Directory('${root.path}/Pictures/OfficeScanner');
-      await picturesDir.create(recursive: true);
+      final dir = await _getPublicDir('Pictures');
       final fileName = 'scan_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      await File(imagePath).copy('${picturesDir.path}/$fileName');
+      final dest = '${dir.path}/$fileName';
+      await File(imagePath).copy(dest);
+      debugPrint('Image saved: $dest');
       return true;
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('saveImageToGallery error: $e\n$st');
       return false;
     }
   }
 
-  /// Copies [file] into the shared Download folder. Returns the new File on
-  /// success, or null if the permission is denied or the write fails.
   Future<File?> saveFileToDownloads(File file) async {
-    if (!await _ensureStoragePermission()) return null;
     try {
-      final root = await _sharedStorageRoot();
-      if (root == null) return null;
-      final downloadsDir = Directory('${root.path}/Download');
-      await downloadsDir.create(recursive: true);
-      final fileName = file.path.split(Platform.pathSeparator).last;
-      return await file.copy('${downloadsDir.path}/$fileName');
-    } catch (_) {
+      final dir = await _getPublicDir('Documents');
+      final fileName = 'scan_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      final dest = '${dir.path}/$fileName';
+      final saved = await file.copy(dest);
+      debugPrint('PDF saved: $dest');
+      return saved;
+    } catch (e, st) {
+      debugPrint('saveFileToDownloads error: $e\n$st');
       return null;
     }
   }

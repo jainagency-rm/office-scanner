@@ -3,13 +3,15 @@ import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart
 
 import 'preview_screen.dart';
 
-/// Launches the ML Kit document scanner UI as soon as this screen is shown.
-/// [existingImages] lets preview_screen reopen the scanner to add more pages
-/// without losing the ones already captured.
 class ScannerScreen extends StatefulWidget {
   final List<String> existingImages;
+  final bool multiPage;
 
-  const ScannerScreen({super.key, this.existingImages = const []});
+  const ScannerScreen({
+    super.key,
+    this.existingImages = const [],
+    this.multiPage = false,
+  });
 
   @override
   State<ScannerScreen> createState() => _ScannerScreenState();
@@ -30,14 +32,13 @@ class _ScannerScreenState extends State<ScannerScreen> {
       options: DocumentScannerOptions(
         documentFormat: DocumentFormat.jpeg,
         mode: ScannerMode.full,
-        pageLimit: 10,
+        pageLimit: widget.multiPage ? 100 : 1,
       ),
     );
     try {
       final result = await scanner.scanDocument();
       if (!mounted) return;
       if (result.images.isEmpty) {
-        // User backed out of the native scanner UI without capturing anything.
         Navigator.pop(context);
         return;
       }
@@ -66,8 +67,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.error_outline,
-                          color: Colors.red, size: 48),
+                      const Icon(Icons.error_outline, color: Colors.red, size: 48),
                       const SizedBox(height: 16),
                       Text(
                         _error!,

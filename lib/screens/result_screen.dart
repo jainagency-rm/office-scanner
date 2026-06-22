@@ -5,6 +5,7 @@ import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../services/pdf_service.dart';
+import '../services/recent_scans_service.dart';
 import '../services/storage_service.dart';
 import '../widgets/loading_overlay.dart';
 
@@ -20,6 +21,7 @@ class ResultScreen extends StatefulWidget {
 class _ResultScreenState extends State<ResultScreen> {
   final _pdfService = PdfService();
   final _storageService = StorageService();
+  final _recentScansService = RecentScansService();
   bool _busy = false;
   String _busyMessage = '';
 
@@ -49,9 +51,15 @@ class _ResultScreenState extends State<ResultScreen> {
     final pdf = await _pdfService.generatePdf(widget.imagePaths);
     final savedPath = await _pdfService.saveToDownloads(pdf);
     if (savedPath != null) {
-      _showMessage('PDF saved to Downloads');
+  _showMessage('PDF saved to Documents/Office Scanner');
+      await _recentScansService.addScan(
+  pdfPath: savedPath,
+  thumbnailPath: widget.imagePaths.first,
+  imagePaths: widget.imagePaths,
+  pageCount: widget.imagePaths.length,
+);
     } else {
-      _showMessage('Could not save PDF', isError: true);
+      _showMessage('Could not save PDF — check app storage permissions', isError: true);
     }
   });
 
