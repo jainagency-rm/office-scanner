@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
 
-import 'preview_screen.dart';
+import '../services/recent_scans_service.dart';
+import '../services/storage_service.dart';
+import 'result_screen.dart';
 
 class ScannerScreen extends StatefulWidget {
   final List<String> existingImages;
   final bool multiPage;
+  final String? existingScanId;
 
   const ScannerScreen({
     super.key,
     this.existingImages = const [],
     this.multiPage = false,
+    this.existingScanId,
   });
 
   @override
@@ -42,10 +46,27 @@ class _ScannerScreenState extends State<ScannerScreen> {
         Navigator.pop(context);
         return;
       }
-      final combined = [...widget.existingImages, ...result.images];
+      final storageService = StorageService();
+      final permanentNewImages = <String>[];
+      for (final path in result.images) {
+        final permanent = await storageService.saveImagePermanently(path);
+        permanentNewImages.add(permanent ?? path);
+      }
+
+      final combined = [...widget.existingImages, ...permanentNewImages];
+      if (widget.existingScanId != null) {
+        final recentScansService = RecentScansService();
+        await recentScansService.updateScan(
+          id: widget.existingScanId!,
+          imagePaths: combined,
+          pageCount: combined.length,
+        );
+        if (mounted) Navigator.pop(context);
+        return;
+      }
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => PreviewScreen(imagePaths: combined)),
+        MaterialPageRoute(builder: (_) => ResultScreen(imagePaths: combined)),
       );
     } catch (e) {
       if (!mounted) return;
@@ -69,24 +90,14 @@ class _ScannerScreenState extends State<ScannerScreen> {
                     children: [
                       const Icon(Icons.error_outline, color: Colors.red, size: 48),
                       const SizedBox(height: 16),
-                      Text(
-                        _error!,
-                        style: const TextStyle(color: Colors.white),
-                        textAlign: TextAlign.center,
-                      ),
+                      Text(_error!, style: const TextStyle(color: Colors.white), textAlign: TextAlign.center),
                       const SizedBox(height: 24),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          OutlinedButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Back'),
-                          ),
+                          OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Back')),
                           const SizedBox(width: 16),
-                          ElevatedButton(
-                            onPressed: _scan,
-                            child: const Text('Retry'),
-                          ),
+                          ElevatedButton(onPressed: _scan, child: const Text('Retry')),
                         ],
                       ),
                     ],

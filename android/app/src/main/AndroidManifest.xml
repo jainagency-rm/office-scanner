@@ -2,9 +2,8 @@
     package="com.jainagency.officescanner">
 
     <uses-permission android:name="android.permission.CAMERA"/>
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+<uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+<!-- WRITE_EXTERNAL_STORAGE aur READ_EXTERNAL_STORAGE remove karo — Android 13 pe useless hain -->
     <application
         android:label="office_scanner"
         android:name="${applicationName}"

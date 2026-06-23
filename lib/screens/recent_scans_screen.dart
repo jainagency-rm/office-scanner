@@ -140,7 +140,8 @@ class _ScanTile extends StatelessWidget {
                 ),
         ),
         title: Text(
-          'Scan — ${scan.pageCount} page${scan.pageCount > 1 ? 's' : ''}',
+          scan.name,
+          overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
         ),
         subtitle: Text(

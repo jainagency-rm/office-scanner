@@ -25,6 +25,37 @@ class _ResultScreenState extends State<ResultScreen> {
   final _recentScansService = RecentScansService();
   bool _busy = false;
   String _busyMessage = '';
+  String? _scanId;
+  List<String>? _permanentPaths;
+
+  @override
+  void initState() {
+    super.initState();
+    _autoSaveScan();
+  }
+
+  Future<void> _autoSaveScan() async {
+    final permanentPaths = <String>[];
+    for (final path in widget.imagePaths) {
+      final permanent = await _storageService.saveImagePermanently(path);
+      permanentPaths.add(permanent ?? path);
+    }
+    final id = await _recentScansService.addScan(
+      pdfPath: '',
+      thumbnailPath: permanentPaths.first,
+      imagePaths: permanentPaths,
+      pageCount: permanentPaths.length,
+    );
+    if (mounted) {
+      setState(() {
+        _scanId = id;
+        _permanentPaths = permanentPaths;
+      });
+    } else {
+      _scanId = id;
+      _permanentPaths = permanentPaths;
+    }
+  }
 
   Future<void> _withBusy(String message, Future<void> Function() action) async {
     setState(() { _busy = true; _busyMessage = message; });
@@ -49,16 +80,19 @@ class _ResultScreenState extends State<ResultScreen> {
   }
 
   Future<void> _saveAsPdf() => _withBusy('Generating PDF...', () async {
-    final pdf = await _pdfService.generatePdf(widget.imagePaths);
+    final pathsToUse = _permanentPaths ?? widget.imagePaths;
+    final pdf = await _pdfService.generatePdf(pathsToUse);
     final savedPath = await _pdfService.saveToDownloads(pdf);
     if (savedPath != null) {
-  _showMessage('PDF saved to Documents/Office Scanner');
-      await _recentScansService.addScan(
-  pdfPath: savedPath,
-  thumbnailPath: widget.imagePaths.first,
-  imagePaths: widget.imagePaths,
-  pageCount: widget.imagePaths.length,
-);
+      _showMessage('PDF saved to Documents/Office Scanner');
+      if (_scanId != null) {
+        await _recentScansService.updateScan(
+          id: _scanId!,
+          imagePaths: pathsToUse,
+          pageCount: pathsToUse.length,
+          pdfPath: savedPath,
+        );
+      }
     } else {
       _showMessage('Could not save PDF — check app storage permissions', isError: true);
     }
@@ -103,8 +137,10 @@ class _ResultScreenState extends State<ResultScreen> {
   actions: [
     TextButton(
       onPressed: () {
-  MainShell.switchToRecentScans(context);
   Navigator.of(context).popUntil((route) => route.isFirst);
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    globalSwitchTab?.call(1);
+  });
 },
       child: const Text('Finish', style: TextStyle(color: Colors.white, fontSize: 16)),
     ),

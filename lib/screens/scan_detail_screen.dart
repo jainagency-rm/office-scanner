@@ -25,6 +25,39 @@ class _ScanDetailScreenState extends State<ScanDetailScreen> {
   final _recentScansService = RecentScansService();
   bool _busy = false;
   String _busyMessage = '';
+  late String _name;
+
+  @override
+  void initState() {
+    super.initState();
+    _name = widget.scan.name;
+  }
+
+  Future<void> _rename() async {
+    final controller = TextEditingController(text: _name);
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Rename Scan'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Scan name'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (newName != null && newName.isNotEmpty && newName != _name) {
+      await _recentScansService.renameScan(widget.scan.id, newName);
+      if (mounted) setState(() => _name = newName);
+    }
+  }
 
   Future<void> _withBusy(String message, Future<void> Function() action) async {
     setState(() { _busy = true; _busyMessage = message; });
@@ -47,24 +80,17 @@ class _ScanDetailScreenState extends State<ScanDetailScreen> {
   }
 
   Future<void> _addPages() async {
-    final countBefore = (await _recentScansService.getRecentScans()).length;
-
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ScannerScreen(
-        existingImages: [widget.scan.thumbnailPath],
-        multiPage: true,
-      ),
+          existingImages: widget.scan.imagePaths,
+          multiPage: true,
+          existingScanId: widget.scan.id,
+        ),
       ),
     );
-
-    // If user saved a new combined scan, the old entry is now a duplicate — remove it.
-    final scansAfter = await _recentScansService.getRecentScans();
-    if (scansAfter.length > countBefore) {
-      await _recentScansService.deleteScan(widget.scan.id);
-      if (mounted) Navigator.pop(context);
-    }
+    if (mounted) Navigator.pop(context);
   }
 
   Future<void> _savePdf() => _withBusy('Saving PDF...', () async {
@@ -133,7 +159,17 @@ class _ScanDetailScreenState extends State<ScanDetailScreen> {
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
-        title: Text('${widget.scan.pageCount} Page${widget.scan.pageCount > 1 ? 's' : ''}'),
+        title: GestureDetector(
+          onTap: _rename,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(child: Text(_name, overflow: TextOverflow.ellipsis)),
+              const SizedBox(width: 6),
+              const Icon(Icons.edit, size: 16),
+            ],
+          ),
+        ),
         centerTitle: true,
         backgroundColor: const Color(0xFF1565C0),
         foregroundColor: Colors.white,

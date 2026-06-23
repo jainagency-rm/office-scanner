@@ -3,9 +3,12 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 
 import 'app_state.dart';
-import 'screens/preview_screen.dart';
 import 'screens/recent_scans_screen.dart';
+import 'screens/result_screen.dart';
 import 'screens/scanner_screen.dart';
+
+int globalCurrentTab = 0;
+void Function(int)? globalSwitchTab;
 
 void main() {
   runApp(const MyApp());
@@ -33,6 +36,11 @@ class MyApp extends StatelessWidget {
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
+  static void switchToRecentScans(BuildContext context) {
+    final state = context.findAncestorStateOfType<_MainShellState>();
+    state?.switchTab(1);
+  }
+
   @override
   State<MainShell> createState() => _MainShellState();
 }
@@ -44,6 +52,7 @@ class _MainShellState extends State<MainShell> {
   void initState() {
     super.initState();
     shellTabIndex.addListener(_onTabChange);
+    globalSwitchTab = (index) => setState(() => _currentIndex = index);
   }
 
   void _onTabChange() => switchTab(shellTabIndex.value);
@@ -125,7 +134,7 @@ class _HomeTabState extends State<HomeTab> {
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => PreviewScreen(
+          builder: (_) => ResultScreen(
             imagePaths: images.map((x) => x.path).toList(),
           ),
         ),
@@ -158,7 +167,7 @@ class _HomeTabState extends State<HomeTab> {
       if (!mounted) return;
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => PreviewScreen(imagePaths: imagePaths)),
+        MaterialPageRoute(builder: (_) => ResultScreen(imagePaths: imagePaths)),
       );
     } catch (e) {
       _showError("File picker error: $e");

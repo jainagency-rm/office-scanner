@@ -11,12 +11,43 @@ import '../services/recent_scans_service.dart';
 import '../widgets/loading_overlay.dart';
 import 'scanner_screen.dart';
 
-/// Runs rotation/brightness off the UI isolate. Always re-derives from the
-/// original bytes so repeated brightness adjustments don't compound.
+enum ScanFilter {
+  noShadow('No Shadow'),
+  original('Original'),
+  lighten('Lighten'),
+  magicColor('Magic Color'),
+  grayscale('Grayscale'),
+  blackAndWhite('B&W');
+
+  final String label;
+  const ScanFilter(this.label);
+}
+
+img.Image _applyFilter(img.Image image, ScanFilter filter) {
+  switch (filter) {
+    case ScanFilter.noShadow:
+      return img.adjustColor(image, brightness: 1.25, contrast: 1.3);
+    case ScanFilter.lighten:
+      return img.adjustColor(image, brightness: 1.3);
+    case ScanFilter.magicColor:
+      final normalized = img.normalize(image, min: 0, max: 255);
+      return img.adjustColor(normalized, contrast: 1.2, saturation: 1.3);
+    case ScanFilter.grayscale:
+      return img.grayscale(image);
+    case ScanFilter.blackAndWhite:
+      final gray = img.grayscale(image);
+      return img.adjustColor(gray, contrast: 2.5);
+    case ScanFilter.original:
+      return image;
+  }
+}
+
+/// Runs rotation/filter off the UI isolate. Always re-derives from the
+/// original bytes so repeated filter changes don't compound.
 Uint8List _processImage(Map<String, dynamic> args) {
   final bytes = args['bytes'] as Uint8List;
   final rotation = args['rotation'] as int;
-  final brightness = args['brightness'] as double;
+  final filter = ScanFilter.values.byName(args['filter'] as String);
   var image = img.decodeImage(bytes);
   if (image == null) {
     throw Exception('Unable to decode image');
@@ -24,9 +55,7 @@ Uint8List _processImage(Map<String, dynamic> args) {
   if (rotation != 0) {
     image = img.copyRotate(image, angle: rotation);
   }
-  if (brightness != 0) {
-    image = img.adjustColor(image, brightness: 1.0 + brightness);
-  }
+  image = _applyFilter(image, filter);
   return img.encodeJpg(image, quality: 90);
 }
 
@@ -34,7 +63,7 @@ class _ScanPage {
   String path;
   Uint8List? originalBytes;
   int rotation = 0;
-  double brightness = 0.0;
+  ScanFilter filter = ScanFilter.original;
   Uint8List? displayBytes;
 
   _ScanPage(this.path);
@@ -77,7 +106,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
   }
 
   Future<void> _recompute(_ScanPage page) async {
-    if (page.rotation == 0 && page.brightness == 0) {
+    if (page.rotation == 0 && page.filter == ScanFilter.original) {
       page.displayBytes = null;
       return;
     }
@@ -85,7 +114,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
     page.displayBytes = await compute(_processImage, {
       'bytes': bytes,
       'rotation': page.rotation,
-      'brightness': page.brightness,
+      'filter': page.filter.name,
     });
   }
 
@@ -107,19 +136,19 @@ class _PreviewScreenState extends State<PreviewScreen> {
     }
   }
 
-  Future<void> _commitBrightness(double value) async {
+  Future<void> _selectFilter(ScanFilter filter) async {
     final page = _current;
-    final previous = page.brightness;
+    final previous = page.filter;
     setState(() {
       _busy = true;
-      _busyMessage = 'Adjusting brightness...';
+      _busyMessage = 'Applying filter...';
     });
     try {
-      page.brightness = value;
+      page.filter = filter;
       await _recompute(page);
     } catch (e) {
-      page.brightness = previous;
-      _showError('Could not adjust brightness: $e');
+      page.filter = previous;
+      _showError('Could not apply filter: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -147,7 +176,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
     final tempDir = await getTemporaryDirectory();
     final paths = <String>[];
     for (final page in _pages) {
-      if (page.rotation != 0 || page.brightness != 0) {
+      if (page.rotation != 0 || page.filter != ScanFilter.original) {
         if (page.displayBytes == null) {
           await _recompute(page);
         }
@@ -157,7 +186,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
         await file.writeAsBytes(page.displayBytes!, flush: true);
         page.path = file.path;
         page.rotation = 0;
-        page.brightness = 0;
+        page.filter = ScanFilter.original;
         page.originalBytes = null;
         page.displayBytes = null;
       }
@@ -256,19 +285,44 @@ class _PreviewScreenState extends State<PreviewScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                children: [
-                  const Icon(Icons.brightness_6),
-                  Expanded(
-                    child: Slider(
-                      value: _current.brightness,
-                      min: -1.0,
-                      max: 1.0,
-                      onChanged: (v) => setState(() => _current.brightness = v),
-                      onChangeEnd: _busy ? null : _commitBrightness,
-                    ),
-                  ),
-                ],
+              SizedBox(
+                height: 64,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  children: ScanFilter.values.map((f) {
+                    final selected = _current.filter == f;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: GestureDetector(
+                        onTap: _busy ? null : () => _selectFilter(f),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: selected ? Colors.teal : Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(8),
+                                border: selected ? Border.all(color: Colors.teal, width: 2) : null,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              f.label,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: selected ? Colors.teal : Colors.grey.shade700,
+                                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
               ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
